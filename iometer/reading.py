@@ -49,6 +49,9 @@ class Reading:
     CURRENT_POWER_OBIS_ALT = "01-00:24.07.00*ff"
     CONSUMPTION_TARIFF_T1_OBIS = "01-00:01.08.01*ff"
     CONSUMPTION_TARIFF_T2_OBIS = "01-00:01.08.02*ff"
+    POWER_PHASE_L1_OBIS = "01-00:24.07.00*ff"
+    POWER_PHASE_L2_OBIS = "01-00:38.07.00*ff"
+    POWER_PHASE_L3_OBIS = "01-00:4C.07.00*ff"
 
     @classmethod
     def from_json(cls, json_str: str) -> "Reading":
@@ -146,6 +149,36 @@ class Reading:
             self.CURRENT_POWER_OBIS_ALT
         )
         return register_alt.value if register_alt else None
+    
+    def get_power_phase_L1(self) -> float | None:
+        """Get power for phase L1 in W.
+
+        Look for OBIS code 24.07.00. Not all meters report this value.
+
+        Returns None if neither OBIS is found, otherwise the value in W as float.
+        """
+        register = self.meter.reading.get_register_by_obis(self.POWER_PHASE_L1_OBIS)
+        return register.value if register else None
+
+    def get_power_phase_L2(self) -> float | None:
+        """Get power for phase L2 in W.
+
+        Look for OBIS code 38.07.00. Not all meters report this value.
+
+        Returns None if neither OBIS is found, otherwise the value in W as float.
+        """
+        register = self.meter.reading.get_register_by_obis(self.POWER_PHASE_L2_OBIS)
+        return register.value if register else None
+
+    def get_power_phase_L3(self) -> float | None:
+        """Get power for phase L3 in W.
+
+        Look for OBIS code 4C.07.00. Not all meters report this value.
+
+        Returns None if neither OBIS is found, otherwise the value in W as float.
+        """
+        register = self.meter.reading.get_register_by_obis(self.POWER_PHASE_L3_OBIS)
+        return register.value if register else None
 
     def __str__(self) -> str:
         return self.to_json()
