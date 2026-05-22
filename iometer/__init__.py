@@ -1,6 +1,6 @@
 """Asynchronous Python client for IOmeter."""
 
-from .client import IOmeterClient
+from .client import IOmeterSSEClient as IOmeterClient
 from .exceptions import (
     IOmeterConnectionError,
     IOmeterNoReadingsError,
