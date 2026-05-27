@@ -10,6 +10,17 @@ Important OBIS codes used in the module:
 - `01-00:02.08.00*ff`: Total energy production on all tariffs
 - `01-00:10.07.00*ff`: Current power consumption
 
+Tariff registers (optional, not reported by all meters):
+
+- `01-00:01.08.01*ff`: Consumption tariff T1
+- `01-00:01.08.02*ff`: Consumption tariff T2
+
+Per-phase power registers (optional, not reported by all meters):
+
+- `01-00:24.07.00*ff`: Power phase L1
+- `01-00:38.07.00*ff`: Power phase L2
+- `01-00:4c.07.00*ff`: Power phase L3
+
 ## Classes
 
 ### Reading
@@ -34,8 +45,17 @@ class Reading:
     def get_total_production(self) -> float:
         # Returns total production in Wh
 
-    def get_current_power(self) -> float:
-        # Returns current power consumption in W
+    def get_current_power(self) -> float | None:
+        # Returns current power in W
+
+    # Tariff registers — returns None if meter does not report them
+    def get_consumption_tariff_T1(self) -> float | None: ...
+    def get_consumption_tariff_T2(self) -> float | None: ...
+
+    # Per-phase power — returns None if meter does not report them
+    def get_power_phase_L1(self) -> float | None: ...
+    def get_power_phase_L2(self) -> float | None: ...
+    def get_power_phase_L3(self) -> float | None: ...
 ```
 
 ### Meter

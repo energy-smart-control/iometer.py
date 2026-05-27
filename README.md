@@ -7,6 +7,7 @@ A Python client for interacting with [IOmeter](https://iometer.de/) devices over
 - 🔌 Asynchronous communication with IOmeter bridge over HTTP
 - 📊 Read energy consumption and energy production data
 - 🔋 Monitor device status including battery level and signal strength
+- 🔄 Two transport modes: polling (`IOmeterClient`) and Server-Sent Events (`IOmeterSSEClient`)
 
 ## Quick Start
 
@@ -16,46 +17,35 @@ A Python client for interacting with [IOmeter](https://iometer.de/) devices over
 pip install iometer
 ```
 
-### Basic Usage
+### Polling
+
+Use `IOmeterClient` to fetch readings on demand:
 
 ```python
 from iometer import IOmeterClient
 
 async def check_meter_reading():
     async with IOmeterClient("192.168.1.100") as client:
-        # Get current reading
         reading = await client.get_current_reading()
-        
-        # Access basic metrics
-        consumption = reading.get_total_consumption()
-        production = reading.get_total_production()
-        power = reading.get_current_power()
-        
-        print(f"Meter: {reading.meter.number}")
-        print(f"Time: {reading.meter.reading.time}")
-        print(f"Consumption: {consumption} Wh")
-        print(f"Production: {production} Wh")
-        print(f"Current Power: {power} W")
+        print(f"Consumption: {reading.get_total_consumption()} Wh")
+        print(f"Production: {reading.get_total_production()} Wh")
+        print(f"Current Power: {reading.get_current_power()} W")
 ```
 
-### Continuous Monitoring
+### Server-Sent Events (SSE)
+
+Use `IOmeterSSEClient` to receive readings as they arrive (push-based):
 
 ```python
-import asyncio
-from iometer import IOmeterClient
+from iometer import IOmeterSSEClient
+from aiohttp import ClientSession
 
-async def monitor_readings(interval: int = 300):
-    """Monitor readings every 5 minutes."""
-    async with IOmeterClient("192.168.1.100") as client:
-        while True:
-            try:
-                reading = await client.get_current_reading()
-                print(f"Time: {reading.meter.reading.time}")
-                print(f"Consumption: {reading.get_total_consumption()} Wh")
-                await asyncio.sleep(interval)
-            except Exception as e:
-                print(f"Error: {e}")
-                await asyncio.sleep(60)  # Wait before retry
+async def stream_readings():
+    async with ClientSession() as session:
+        client = IOmeterSSEClient("192.168.1.100", session=session)
+        async for reading in client.watch_readings():
+            print(f"Consumption: {reading.get_total_consumption()} Wh")
+            print(f"Current Power: {reading.get_current_power()} W")
 ```
 ### Device Status Information
 
