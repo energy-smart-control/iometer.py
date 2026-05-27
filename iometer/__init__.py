@@ -1,6 +1,7 @@
 """Asynchronous Python client for IOmeter."""
 
-from .client import IOmeterSSEClient as IOmeterClient
+from .client import IOmeterClient
+from .client import IOmeterSSEClient
 from .exceptions import (
     IOmeterConnectionError,
     IOmeterNoReadingsError,
@@ -10,10 +11,11 @@ from .exceptions import (
 from .reading import Reading
 from .status import Status
 
-__version__ = "2.0.4"
+__version__ = "2.0.5"
 
 __all__ = [
     "IOmeterClient",
+    "IOmeterSSEClient",
     "IOmeterConnectionError",
     "IOmeterTimeoutError",
     "IOmeterNoReadingsError",

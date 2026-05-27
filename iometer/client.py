@@ -5,8 +5,14 @@ from typing import AsyncGenerator, Optional, Self
 
 from aiohttp import ClientSession, ClientResponseError
 from aiohttp_sse_client import client as sse_client
+from yarl import URL
 
-from .exceptions import IOmeterTimeoutError, IOmeterNoReadingsError, IOmeterNoStatusError
+from .exceptions import (
+    IOmeterConnectionError,
+    IOmeterTimeoutError,
+    IOmeterNoReadingsError,
+    IOmeterNoStatusError,
+)
 from .reading import Reading
 from .status import Status
 
@@ -103,4 +109,87 @@ class IOmeterSSEClient:
 
     async def __aexit__(self, *_exc_info: object) -> None:
         """Clean up the client session."""
+        await self.close()
+
+
+@dataclass
+class IOmeterClient:
+    """Main IOmeter client class for handling HTTP connections with the IOmeter bridge.
+
+    Attributes:
+        host: The hostname or IP address of the IOmeter bridge
+        request_timeout: Number of seconds to wait for bridge response
+        session: Optional aiohttp ClientSession for making requests
+
+    Example:
+        async with IOmeterClient("192.168.1.100") as client:
+            reading = await client.get_current_reading()
+            status = await client.get_current_status()
+    """
+
+    host: str
+    request_timeout: int = 60
+    session: Optional[ClientSession] = None
+
+    async def _request(self, uri: str) -> str:
+        if not self.session:
+            raise RuntimeError("Client session not initialized")
+
+        url = URL.build(scheme="http", host=self.host) / uri
+        headers = {
+            "User-Agent": "PythonIOmeter/0.1",
+            "Accept": "application/json",
+        }
+
+        try:
+            async with asyncio.timeout(self.request_timeout):
+                response = await self.session.get(url, headers=headers)
+                response.raise_for_status()
+                return await response.text()
+
+        except asyncio.TimeoutError as error:
+            raise IOmeterTimeoutError(
+                "Timeout while communicating with IOmeter bridge"
+            ) from error
+
+        except ClientResponseError as error:
+            if error.status == 404:
+                if "reading" in uri:
+                    raise IOmeterNoReadingsError(
+                        "No readings available from IOmeter bridge"
+                    ) from error
+                if "status" in uri:
+                    raise IOmeterNoStatusError(
+                        "No status available from IOmeter bridge"
+                    ) from error
+            raise IOmeterConnectionError(
+                f"Bridge returned error {error.status}: {error.message}"
+            ) from error
+
+        except Exception as error:
+            raise IOmeterConnectionError(
+                f"Error communicating with IOmeter bridge: {str(error)}"
+            ) from error
+
+    async def get_current_reading(self) -> Reading:
+        """Get current reading from IOmeter bridge."""
+        response = await self._request("v1/reading")
+        return Reading.from_json(response)
+
+    async def get_current_status(self) -> Status:
+        """Get device status from IOmeter bridge."""
+        response = await self._request("v1/status")
+        return Status.from_json(response)
+
+    async def close(self) -> None:
+        """Close the client session."""
+        if self.session:
+            await self.session.close()
+            self.session = None
+
+    async def __aenter__(self) -> Self:
+        self.session = self.session or ClientSession()
+        return self
+
+    async def __aexit__(self, *_exc_info: object) -> None:
         await self.close()
