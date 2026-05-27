@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 class Bridge:
     """Represents the bridge device status"""
 
-    rssi: int
-    version: str
+    rssi: int | None
+    version: str | None
 
 
 @dataclass
@@ -56,6 +56,7 @@ class Status:
     """Top level class representing the complete device status"""
 
     device: Device
+    installation_id: str
     meter: Meter = field(default_factory=NullMeter)
     typename: str = "iometer.status.v1"
 
@@ -65,9 +66,10 @@ class Status:
         data = json.loads(json_str)
 
         # Create bridge
+        bridge_data = data["device"]["bridge"]
         bridge = Bridge(
-            rssi=data["device"]["bridge"]["rssi"],
-            version=data["device"]["bridge"]["version"],
+            rssi=bridge_data.get("rssi"),
+            version=bridge_data.get("version"),
         )
 
         # Create Core
@@ -92,13 +94,14 @@ class Status:
         )
 
         # Create full status
-        return cls(meter=meter, device=device)
+        return cls(device=device, installation_id=data["installationId"], meter=meter)
 
     def to_json(self) -> str:
         """Convert the status to JSON string"""
         return json.dumps(
             {
                 "__typename": self.typename,
+                "installationId": self.installation_id,
                 # If meter is a NullMeter, serialize as null
                 "meter": {"number": self.meter.number} if self.meter else None,
                 "device": {
