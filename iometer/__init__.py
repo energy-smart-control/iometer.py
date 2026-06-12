@@ -11,7 +11,7 @@ from .exceptions import (
 from .reading import Reading
 from .status import Status
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 __all__ = [
     "IOmeterClient",
