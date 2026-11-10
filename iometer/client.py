@@ -6,6 +6,7 @@ from typing import AsyncGenerator, Callable, Optional, Self
 
 from aiohttp import ClientSession, ClientResponseError
 from aiohttp_sse_client import client as sse_client
+from aiohttp import ClientTimeout
 from yarl import URL
 
 from .exceptions import (
@@ -59,7 +60,12 @@ class IOmeterSSEClient:
             async with sse_client.EventSource(
                 url,
                 session=self.session,
-                timeout=self.request_timeout,
+                timeout=ClientTimeout(
+                    total=None,
+                    sock_connect=self.request_timeout,
+                    sock_read=self.request_timeout,
+                ),
+
             ) as event_source:
                 async for event in event_source:
                     if event.type == event_type and event.data:
