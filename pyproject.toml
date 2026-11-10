@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "iometer"
-version = "1.0.2"
+version = "1.0.3"
 description = "Asynchronous Python client for IOmeter"
 authors = ["jukrebs <justus@iometer.de>"]
 license = "MIT"
