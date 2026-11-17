@@ -200,6 +200,8 @@ data: {"__typename":"iometer.status.v1","installationId":"...","device":{...}}
 
 The client filters by event type and passes only the `data` field to the parser. Unknown event types are silently ignored.
 
+A line may end with CRLF, LF or a lone CR, as the SSE specification allows. The bridge sends runs of lone CRs between events, so the client's parser treats all three as line endings.
+
 ---
 
 ## Design constraints to keep in mind

@@ -1,12 +1,12 @@
 """Asynchronous Python client for IOmeter."""
 
 import asyncio
+import codecs
+import re
 from dataclasses import dataclass
 from typing import AsyncGenerator, Callable, Optional, Self
 
-from aiohttp import ClientSession, ClientResponseError
-from aiohttp_sse_client import client as sse_client
-from aiohttp import ClientTimeout
+from aiohttp import ClientSession, ClientResponseError, ClientTimeout, StreamReader
 from yarl import URL
 
 from .exceptions import (
@@ -17,6 +17,52 @@ from .exceptions import (
 )
 from .reading import Reading
 from .status import Status
+
+# The event-stream format ends a line with CRLF, LF or a lone CR. The bridge sends
+# runs of lone CRs between events, so splitting on LF alone is not enough.
+_LINE_END = re.compile(r"\r\n|\r|\n")
+
+
+async def _iter_sse_events(content: StreamReader) -> AsyncGenerator[tuple[str, str], None]:
+    """Parse an SSE byte stream into (event type, data) pairs.
+
+    Implements the parsing rules of the WHATWG event-stream format: fields
+    `event` and `data`, comments starting with `:`, an empty line dispatches
+    the event, and any of CRLF, LF or CR ends a line.
+    """
+    decoder = codecs.getincrementaldecoder("utf-8")()
+    buffer = ""
+    event_type = ""
+    data: list[str] = []
+    # Set when a chunk ended with CR: a LF at the start of the next chunk is
+    # the second half of that CRLF, not an empty line of its own.
+    skip_lf = False
+    async for chunk in content.iter_any():
+        text = decoder.decode(chunk)
+        if not text:
+            continue
+        if skip_lf and text.startswith("\n"):
+            text = text[1:]
+        skip_lf = False
+        buffer += text
+        while match := _LINE_END.search(buffer):
+            line = buffer[: match.start()]
+            buffer = buffer[match.end() :]
+            skip_lf = match.group() == "\r" and not buffer
+            if line == "":
+                if data:
+                    yield event_type or "message", "\n".join(data)
+                event_type = ""
+                data = []
+                continue
+            if line.startswith(":"):
+                continue
+            name, _, value = line.partition(":")
+            value = value.removeprefix(" ")
+            if name == "event":
+                event_type = value
+            elif name == "data":
+                data.append(value)
 
 
 @dataclass
@@ -57,18 +103,19 @@ class IOmeterSSEClient:
         event_type = "readingEvent" if "reading" in uri else "statusEvent"
 
         try:
-            async with sse_client.EventSource(
+            async with self.session.get(
                 url,
-                session=self.session,
+                headers={"Accept": "text/event-stream", "Cache-Control": "no-cache"},
                 timeout=ClientTimeout(
                     total=None,
                     sock_connect=self.request_timeout,
                     sock_read=self.request_timeout,
                 ),
-            ) as event_source:
-                async for event in event_source:
-                    if event.type == event_type and event.data:
-                        yield event.data
+                raise_for_status=True,
+            ) as response:
+                async for event, data in _iter_sse_events(response.content):
+                    if event == event_type and data:
+                        yield data
 
         except asyncio.TimeoutError as err:
             raise IOmeterTimeoutError("Timeout while communicating") from err

@@ -4,7 +4,7 @@ import pytest
 import json
 from aiohttp import ClientSession
 
-from iometer.client import IOmeterSSEClient
+from iometer.client import IOmeterSSEClient, _iter_sse_events
 from iometer.exceptions import (
     IOmeterConnectionError,
     IOmeterNoReadingsError,
@@ -464,3 +464,65 @@ async def test_status_not_found(client_iometer):
     with pytest.raises(IOmeterNoStatusError, match="No status found"):
         async for status in client_iometer.watch_status():
             break
+
+
+class _FakeContent:
+    """Stand-in for aiohttp's StreamReader that yields fixed chunks."""
+
+    def __init__(self, chunks):
+        self._chunks = chunks
+
+    async def iter_any(self):
+        for chunk in self._chunks:
+            yield chunk
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("chunks", "expected"),
+    [
+        pytest.param(
+            [b'event: readingEvent\ndata: {"a":1}\n\n'],
+            [("readingEvent", '{"a":1}')],
+            id="lf",
+        ),
+        pytest.param(
+            [
+                b'event: readingEvent\ndata: {"a":1}\n\n',
+                b"\r" * 27,
+                b'event: readingEvent\ndata: {"a":2}\n\n',
+            ],
+            [("readingEvent", '{"a":1}'), ("readingEvent", '{"a":2}')],
+            id="bridge-cr-runs-between-events",
+        ),
+        pytest.param(
+            [b"event: readingEvent\r", b"\ndata: x\r\n\r\n"],
+            [("readingEvent", "x")],
+            id="crlf-split-across-chunks",
+        ),
+        pytest.param(
+            [b"event: statusEvent\rdata: y\r\r"],
+            [("statusEvent", "y")],
+            id="lone-cr",
+        ),
+        pytest.param(
+            ["data: Zähler\n\n".encode()[:8], "data: Zähler\n\n".encode()[8:]],
+            [("message", "Zähler")],
+            id="utf8-split-across-chunks",
+        ),
+        pytest.param(
+            [b": keepalive\nevent: e\ndata: a\ndata: b\n\n"],
+            [("e", "a\nb")],
+            id="comment-and-multiline-data",
+        ),
+        pytest.param(
+            [b"event: e\ndata: 1\n\ndata: 2\n\n"],
+            [("e", "1"), ("message", "2")],
+            id="event-type-reset-after-dispatch",
+        ),
+    ],
+)
+async def test_iter_sse_events(chunks, expected):
+    """Test parsing of the SSE wire format, including CR line endings."""
+    events = [event async for event in _iter_sse_events(_FakeContent(chunks))]
+    assert events == expected
