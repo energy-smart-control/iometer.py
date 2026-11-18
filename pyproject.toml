@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "iometer"
-version = "1.0.3"
+version = "1.0.4"
 description = "Asynchronous Python client for IOmeter"
 authors = ["jukrebs <justus@iometer.de>"]
 license = "MIT"
@@ -12,8 +12,8 @@ classifiers = [
 ]
 keywords = ["IOmeter", "smart meter", "energy", "automation"]
 homepage = "https://iometer.de/"
-repository = "https://github.com/iometer-gmbh/iometer.py"
-documentation = "https://github.com/iometer-gmbh/iometer.py/blob/main/docs/index.md"
+repository = "https://github.com/energy-smart-control/iometer.py"
+documentation = "https://github.com/energy-smart-control/iometer.py/blob/main/docs/index.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
